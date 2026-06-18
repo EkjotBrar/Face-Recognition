@@ -1,0 +1,138 @@
+from deepface import DeepFace
+import os.path
+import tkinter as tk
+
+import cv2
+import util
+from PIL import Image, ImageTk
+
+class App:
+    def __init__(self):
+        self.main_window = tk.Tk()
+        self.main_window.title("Face Recognition App")
+        self.main_window.geometry("1200x520+350+100")
+
+        self.login_button_main_window = util.create_button(self.main_window, "Login", "dark green", self.login)
+        self.register_button_main_window = util.create_button(self.main_window, "Register", "light blue", self.register)
+
+        self.login_button_main_window.place(x=750, y=300)
+        self.register_button_main_window.place(x=750, y=400)
+
+        self.webcam_label = util.get_img_label(self.main_window)
+        self.webcam_label.place(x=10, y=0, width=700, height=500)
+
+        self.add_webcam(self.webcam_label)
+
+        self.db_dir = './db'
+        if not os.path.exists(self.db_dir):
+            os.mkdir(self.db_dir)
+        
+        self.log_path = './log.txt'
+    
+    def add_webcam(self, label):
+        if 'cap' not in self.__dict__:
+            self.cap = cv2.VideoCapture(0)
+        
+        self._label = label
+
+        self.process_webcam()
+
+    #Taking frames from the camera and converting them to a format that can be displayed in the tkinter window
+    def process_webcam(self):
+        ret, frame = self.cap.read()
+        self.recent_capture_arr = frame
+
+        img = cv2.cvtColor(self.recent_capture_arr,cv2.COLOR_BGR2RGB)
+        self.recent_capture_img = Image.fromarray(img)
+
+        imgtk = ImageTk.PhotoImage(image=self.recent_capture_img)
+
+        self._label.imgtk = imgtk
+        self._label.configure(image=imgtk)
+
+        self._label.after(20, self.process_webcam)
+         
+
+    def login(self):
+
+        unknown_img_path = './.tmp.jpg'
+
+        cv2.imwrite(unknown_img_path, self.recent_capture_arr)
+        output = str(DeepFace.find(img_path=unknown_img_path, db_path=self.db_dir))
+        output.split(',')[1][1:-3]
+
+        if os.name in ['unknown_person', 'no_persons_found']:
+            util.msg_box("Login Failed", "No matching face found in the database.")
+        else:
+            util.msg_box("Login Success", "Welcome back, {}!".format(output.split(',')[1][1:-3]))
+            with open(self.log_path, 'a') as log_file:
+                log_file.write("User: {}, Time: {}\n".format(output.split(',')[1][1:-3], str(cv2.getTickCount())))
+                log_file.close()
+
+        os.remove(unknown_img_path)
+
+    def register(self):
+        self.register_window = tk.Toplevel(self.main_window)
+        self.register_window.title("Register")  
+        self.register_window.geometry("1200x520+370+120")
+
+        self.webcam_label = util.get_img_label(self.register_window)
+        self.webcam_label.place(x=10, y=0, width=700, height=500)
+        self.add_webcam(self.webcam_label)
+ 
+        self.take_photo_button = util.create_button(self.register_window, "Take Photo", "dark green", self.take_photo)
+        self.take_photo_button.place(x=750, y=300)
+    
+    def take_photo(self):
+        self.photo_window = tk.Toplevel(self.register_window)
+        self.photo_window.title("Take Photo")  
+        self.photo_window.geometry("1200x520+370+120")
+
+        self.accept_photo_button = util.create_button(self.photo_window, "Accept Photo", "dark green", self.accept_photo)
+        self.accept_photo_button.place(x=750, y=300)
+
+        self.decline_photo_button = util.create_button(self.photo_window, "Decline Photo", "red", self.decline_photo)
+        self.decline_photo_button.place(x=750, y=400)
+
+        self.captured_photo_label = util.get_img_label(self.photo_window)
+        self.captured_photo_label.place(x=10, y=0, width=700, height=500)
+
+        self.add_image_to_label(self.captured_photo_label)
+
+        self.entry_text_register_new_user = util.get_entry_text(self.photo_window)
+        self.entry_text_register_new_user.place(x=750, y=150)
+
+        self.text_label_register_new_user = util.get_text_label(self.photo_window, "Enter your name")
+        self.text_label_register_new_user.place(x=750, y=70)
+
+    
+    def accept_photo(self):
+        name = self.entry_text_register_new_user.get(1.0, "end-1c")
+        
+        cv2.imwrite(os.path.join(self.db_dir, '{}.jpg'.format(name)), self.register_new_user_capture)
+
+        util.msg_box("Success", "Photo saved successfully!")
+
+        self.photo_window.destroy()
+        self.register_window.destroy()
+        
+    def decline_photo(self):
+        self.photo_window.destroy()
+
+    def add_image_to_label(self, label):
+        imgtk = ImageTk.PhotoImage(image=self.recent_capture_img)
+
+        label.imgtk = imgtk
+        label.configure(image=imgtk)
+
+        self.register_new_user_capture = self.recent_capture_arr.copy()
+
+    def start(self):
+        self.main_window.mainloop()
+    
+
+
+if __name__ == "__main__":
+    app = App()
+    app.start()
+
